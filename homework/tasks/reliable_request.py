@@ -1,6 +1,6 @@
 import abc
-
 import httpx
+import logging
 
 
 class ResultsObserver(abc.ABC):
@@ -18,13 +18,19 @@ async def do_reliable_request(url: str, observer: ResultsObserver) -> None:
 
     Все успешно полученные результаты должны регистрироваться с помощью обсёрвера.
     """
+    retries = 10
+    timeout = 10.0
 
     async with httpx.AsyncClient() as client:
-        # YOUR CODE GOES HERE
-        response = await client.get(url)
-        response.raise_for_status()
-        data = response.read()
+        for _ in range(retries):
+            try:
+                response = await client.get(url, timeout=timeout)
+                response.raise_for_status()
+                data = response.read()
 
-        observer.observe(data)
-        return
-        #####################
+                observer.observe(data)
+                return
+            except httpx.HTTPStatusError as error:
+                logging.error(f"Произошла ошибка HTTP: {error}")
+            except httpx.ReadTimeout as error:
+                logging.error(f"Произошёл timeout: {error}")
